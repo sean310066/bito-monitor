@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bito 搬磚監控</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232a78d6'/%3E%3Cpath d='M5 22l7-8 5 4 10-11' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f7f9; --card:#ffffff; --ink:#1d2330; --muted:#6b7482; --line:#e3e6eb; --grid:#eceef2; --axis:#8a93a0;
+  --bito:#2a78d6; --max:#17a673; --enter:#e8632c; --be:#7b8494; --bet:#b3bac5; --fx:#d9822b; --dt:#5b4bc4; --dm:#d86a9a;
+  --bank:rgba(23,166,115,.10); --hol:rgba(120,130,150,.10); --sel:rgba(42,120,214,.16); --ok:#17895f; --warn:#c9821a; --bad:#c0392b;
+  --accent:#2a78d6; --chip:#eef1f5;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f1216; --card:#171b21; --ink:#e7eaf0; --muted:#98a2b3; --line:#2a303a; --grid:#232831; --axis:#7d8796;
+    --bito:#5aa2f5; --max:#3fcf98; --enter:#ff8a52; --be:#a0a9b8; --bet:#5d6675; --fx:#f0a455; --dt:#9d8cff; --dm:#f090b8;
+    --bank:rgba(63,207,152,.11); --hol:rgba(150,160,180,.09); --sel:rgba(90,162,245,.22); --chip:#222831; }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:1240px;margin:0 auto;padding:14px 16px 40px}
+.top{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}
+.top h1{font-size:20px;margin:0;letter-spacing:.02em}
+.badge{padding:2px 10px;border-radius:999px;font-size:12px;color:#fff;background:var(--muted);white-space:nowrap}
+.badge.ok{background:var(--ok)}.badge.warn{background:var(--warn)}.badge.bad{background:var(--bad)}
+.muted{color:var(--muted);font-size:12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:8px;margin:0 0 12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 11px;min-width:0}
+.tile .k{font-size:11.5px;color:var(--muted)}
+.tile .v{font:600 19px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tile .d{font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+.pos{color:var(--ok)}.neg{color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.controls .row{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.controls .row + .row{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow-x:auto;max-width:100%;background:var(--card)}
+.seg button{border:0;background:transparent;color:var(--ink);padding:5px 10px;font:inherit;font-size:13px;cursor:pointer;border-right:1px solid var(--line);min-height:30px;white-space:nowrap;flex:0 0 auto}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--chip)}
+.seg button.on{background:var(--accent);color:#fff}
+button.plain{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer;min-height:30px}
+button.plain:hover{background:var(--chip)}
+button.plain.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+label.f{font-size:12.5px;color:var(--muted);display:inline-flex;gap:5px;align-items:center;white-space:nowrap;min-width:0;max-width:100%}
+label.f input[type=datetime-local],label.f select{font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 6px;min-height:30px;min-width:0;max-width:100%;flex:0 1 auto;text-overflow:ellipsis}
+label.chk{font-size:13px;display:inline-flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap}
+.ptitle{font-size:12.5px;color:var(--muted);margin-bottom:4px}
+.phead{display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline;margin-bottom:2px}
+.phead .pt{font-weight:600;font-size:13.5px}
+.phead .pl{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--muted);display:flex;flex-wrap:wrap;gap:0 12px}
+.phead .pl b{color:var(--ink);font-weight:600}
+.sw{display:inline-block;width:10px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
+.cvbox{position:relative;width:100%}
+.cvbox canvas{display:block;width:100%}
+.cvbox canvas.ovl{position:absolute;left:0;top:0;touch-action:pan-y;cursor:crosshair}
+#ov{touch-action:none;cursor:grab;display:block;width:100%}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px}
+.statgrid div{font-size:12.5px;color:var(--muted)}
+.statgrid b{display:block;color:var(--ink);font:600 15px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums}
+h2{font-size:15px;margin:0 0 6px}
+.tblbox{max-height:430px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+th,td{padding:4px 9px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
+th{position:sticky;top:0;background:var(--card);color:var(--muted);font-weight:600;z-index:1;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--chip)}
+tr.off td{color:var(--muted)}
+tr.cur td{background:var(--sel)}
+td.bar{position:relative;min-width:92px}
+td.bar i{position:absolute;left:0;top:3px;bottom:3px;background:var(--bank);border-right:2px solid var(--max);z-index:0}
+td.bar span{position:relative;z-index:1}
+.note{font-size:12px;color:var(--muted);margin:6px 0 0}
+footer{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.7}
+footer b{color:var(--ink)}
+.err{background:#fdecea;color:#8a1f15;border:1px solid #f5c2bd;border-radius:8px;padding:8px 12px;margin-bottom:10px;display:none}
+@media (max-width:640px){
+  .wrap{padding:10px 10px 30px}.tile .v{font-size:17px}.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  th,td{padding:4px 6px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Bito 搬磚監控</h1>
+    <span id="badge" class="badge">載入中…</span>
+    <span id="clock" class="muted"></span>
+  </header>
+  <div id="err" class="err"></div>
+  <section id="tiles" class="tiles"></section>
+
+  <section class="card controls">
+    <div class="row">
+      <div class="seg" id="presets"></div>
+      <div class="seg" id="nav">
+        <button data-nav="left" title="往前半個視窗（←）">◀</button>
+        <button data-nav="right" title="往後半個視窗（→）">▶</button>
+        <button data-nav="out" title="拉遠（−）">－</button>
+        <button data-nav="in" title="拉近（＋）">＋</button>
+      </div>
+      <button class="plain" id="latest" title="視窗右緣貼齊最新資料並持續跟隨">跟隨最新</button>
+      <label class="f">起 <input type="datetime-local" id="from" step="60"></label>
+      <label class="f">迄 <input type="datetime-local" id="to" step="60"></label>
+      <button class="plain" id="copy" title="複製目前視窗的分享連結">複製連結</button>
+    </div>
+    <div class="row">
+      <label class="f">溢價算法 <select id="metric"></select></label>
+      <label class="f">成本情境 <select id="tier"></select></label>
+      <label class="chk"><input type="checkbox" id="sMax"> MAX</label>
+      <label class="chk"><input type="checkbox" id="sFx"> 匯率</label>
+      <label class="chk"><input type="checkbox" id="sDepth"> 深度</label>
+      <label class="chk"><input type="checkbox" id="sDiff"> 兩所淨價差</label>
+      <span id="resnote" class="muted"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="ptitle">全期間總覽 — 拖曳藍框移動視窗、拉左右邊緣改長度、在框外拖曳直接框選新區間</div>
+    <canvas id="ov"></canvas>
+  </section>
+
+  <section id="panels"></section>
+
+  <section class="card">
+    <h2 id="wtitle">視窗統計</h2>
+    <div id="wstats" class="statgrid"></div>
+    <p class="note" id="wnote"></p>
+  </section>
+
+  <section class="card">
+    <h2>每日摘要（點一列跳到那一天）</h2>
+    <div class="tblbox"><table id="daily"><thead></thead><tbody></tbody></table></div>
+    <p class="note" id="dnote"></p>
+  </section>
+
+  <section class="card">
+    <h2>近期警報</h2>
+    <div class="tblbox" style="max-height:230px"><table id="alerts"><thead><tr><th>時間（台灣）</th><th>類型</th><th>當時溢價</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <footer>
+    <b>怎麼讀：</b>溢價＝BitoPro（或 MAX）USDT/TWD 價格 ÷ USD/TWD 中間價（Yahoo＋Wise 取中位數）− 1。
+    <b>損平線</b>＝買匯成本＋美元換 USDT 手續費＋交易手續費＋出金費攤提，溢價要高過它這一圈才不賠；手續費會隨日期與「成本情境」變動，所以線是階梯狀。
+    淺綠底＝可換匯時段（Bankee 線上換匯：台灣時間營業日 <span id="bh">09:30–15:30</span>）；淡灰底＝週末與國定假日（銀行不開）；綠色虛線＝當日台幣出金截止；▲▼＝監控發出進場／退出警報的時刻。
+    週末與假日匯率停在週五紐約收盤價，圖上溢價會被週五晚間的匯率變動放大或縮小，不等於銀行開門時還拿得到。
+    <br><b>操作：</b>在圖上按住左鍵拖曳＝框選放大；Shift＋拖曳或觸控單指＝平移；Ctrl＋滾輪或雙指＝縮放；雙擊＝拉遠。視窗越短解析度越高（≤12 小時看原始 15 秒資料，≤8 天看 1 分鐘均值，更長看 15 分鐘均值並畫出高低帶）。
+    <br>本頁僅為個人監控紀錄，不構成投資建議。
+  </footer>
+</div>
+
+<script>
+'use strict';
+/* ───────────── 基本工具 ───────────── */
+const TZO = 8 * 3600, DAY = 86400;
+const $ = id => document.getElementById(id);
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem('bito.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v){ try { localStorage.setItem('bito.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+/* 顏色取自 CSS 變數（自動跟著深／淺色模式），每次重畫前讀一次 */
+const PAL = {};
+function readPalette(){ const cs = getComputedStyle(document.documentElement); for (const k of ['bito', 'max', 'enter', 'be', 'bet', 'fx', 'dt', 'dm', 'bank', 'hol', 'sel', 'ok', 'muted', 'axis', 'grid', 'line', 'card', 'accent', 'ink']) PAL[k] = cs.getPropertyValue('--' + k).trim(); }
+const css = n => PAL[n.slice(2)] || (readPalette(), PAL[n.slice(2)]);
+const pad2 = n => String(n).padStart(2, '0');
+const WD = '日一二三四五六';
+function tw(ts){ const d = new Date((ts + TZO) * 1000); return {y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes(), s: d.getUTCSeconds(), wd: d.getUTCDay()}; }
+function dayStr(ts){ const p = tw(ts); return p.y + '-' + pad2(p.mo) + '-' + pad2(p.d); }
+function dayStart(day){ return Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10)) / 1000 - TZO; }
+function fmtT(ts, sec){ const p = tw(ts); return pad2(p.mo) + '/' + pad2(p.d) + '（' + WD[p.wd] + '）' + pad2(p.h) + ':' + pad2(p.mi) + (sec ? ':' + pad2(p.s) : ''); }
+function fmtFull(ts){ const p = tw(ts); return p.y + '-' + pad2(p.mo) + '-' + pad2(p.d) + ' ' + pad2(p.h) + ':' + pad2(p.mi) + ':' + pad2(p.s); }
+function toInput(ts){ const p = tw(ts); return p.y + '-' + pad2(p.mo) + '-' + pad2(p.d) + 'T' + pad2(p.h) + ':' + pad2(p.mi); }
+function fromInput(s){ const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(s || ''); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 1000 - TZO : NaN; }
+const fPct = (v, n) => (v == null || v !== v) ? '—' : (v >= 0 ? '+' : '') + v.toFixed(n == null ? 3 : n) + '%';
+const fFx = v => (v == null || v !== v) ? '—' : v.toFixed(4);
+const fInt = v => (v == null || v !== v) ? '—' : Math.round(v).toLocaleString('en-US');
+const fSpan = s => s >= 2 * DAY ? (s / DAY).toFixed(s % DAY ? 1 : 0) + ' 天' : s >= 2 * 3600 ? (s / 3600).toFixed(s % 3600 ? 1 : 0) + ' 小時' : Math.round(s / 60) + ' 分';
+function lowerBound(a, x){ let lo = 0, hi = a.length; while (lo < hi){ const m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ───────────── 狀態 ───────────── */
+const PRESETS = [['6h', '6 小時', 6 * 3600], ['1d', '24 小時', DAY], ['3d', '3 天', 3 * DAY], ['7d', '7 天', 7 * DAY], ['14d', '14 天', 14 * DAY], ['30d', '30 天', 30 * DAY], ['all', '全部', 0]];
+const METRICS = {
+  b3: {label: '賣 3 萬 U 的均價（vwap30k）', short: 'vwap30k', bito: 'b3', max: 'm3'},
+  b1: {label: '賣 1 萬 U 的均價（vwap10k）', short: 'vwap10k', bito: 'b1', max: 'm1'},
+  bb: {label: '買一價 bid1（小額市價賣）', short: 'bid1', bito: 'bb', max: 'mb'},
+  ba: {label: '賣一價 ask1（掛單賣）', short: 'ask1', bito: 'ba', max: 'ma'}
+};
+const S = {
+  meta: null, days: [], dayMap: new Map(), ov: null,
+  cache: {d: new Map(), r: new Map()}, concat: new Map(),
+  view: {t0: 0, t1: 0, follow: true, preset: '3d'},
+  metric: LS.get('metric', 'b3'), tier: LS.get('tier', null),
+  show: Object.assign({max: true, fx: true, depth: true, diff: false}, LS.get('show', {})),
+  hover: null, level: 'o', blk: null, drag: null, costCache: new Map()
+};
+const LOCAL = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+
+/* ───────────── 載入與解碼 ───────────── */
+function decArr(a, k){ const s = k === 'fx' ? 1e4 : (k === 'db' || k === 'dx') ? 1 : 1e3; const o = new Float64Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] == null ? NaN : a[i] / s; return o; }
+function decBlock(j, raw){
+  const blk = {c: {}, lo: {}, hi: {}, step: raw ? (S.meta ? S.meta.interval_sec : 15) : j.step};
+  const n = raw ? j.t.length : (j.c.fx ? j.c.fx.length : 0);
+  blk.t = new Float64Array(n);
+  if (raw) for (let i = 0; i < n; i++) blk.t[i] = j.t0 + j.t[i];
+  else for (let i = 0; i < n; i++) blk.t[i] = j.t0 + (i + 0.5) * j.step;
+  for (const k in j.c) blk.c[k] = decArr(j.c[k], k);
+  for (const k in (j.lo || {})){ blk.lo[k] = decArr(j.lo[k], k); blk.hi[k] = decArr(j.hi[k], k); }
+  return blk;
+}
+const EMPTY = {t: new Float64Array(0), c: {}, lo: {}, hi: {}, step: 60};
+async function getJSON(url){ const r = await fetch(url, {cache: 'no-store'}); if (!r.ok) throw new Error(url + ' → HTTP ' + r.status); return r.json(); }
+function loadDay(level, day){
+  const m = S.cache[level];
+  if (m.has(day)) return m.get(day);
+  const st = S.dayMap.get(day);
+  const tag = st && st.final ? 'v=' + S.meta.v : 'g=' + S.meta.generated;
+  const ent = {blk: null, p: null};
+  ent.p = getJSON('data/' + level + '/' + day + '.json?' + tag).then(j => decBlock(j, level === 'r')).catch(() => EMPTY)
+    .then(b => { ent.blk = b; S.concat.clear(); requestRender(); scheduleStats(); return b; });
+  m.set(day, ent);
+  return ent;
+}
+function daysIn(t0, t1){ const out = []; let d = dayStr(Math.max(t0, S.meta.t_first)); const last = dayStr(Math.min(t1, S.meta.t_last)); let guard = 0; while (d <= last && guard++ < 4000){ out.push(d); d = dayStr(dayStart(d) + DAY + 3600); } return out; }
+function wantLevel(span){ return span <= 12 * 3600 ? 'r' : span <= 8 * DAY ? 'd' : 'o'; }
+function concatBlocks(key, blks){
+  if (S.concat.has(key)) return S.concat.get(key);
+  let n = 0; for (const b of blks) n += b.t.length;
+  const out = {t: new Float64Array(n), c: {}, lo: {}, hi: {}, step: blks.length ? blks[0].step : 60};
+  const keys = new Set(), bands = new Set();
+  for (const b of blks){ for (const k in b.c) keys.add(k); for (const k in b.lo) bands.add(k); }
+  for (const k of keys) out.c[k] = new Float64Array(n).fill(NaN);
+  for (const k of bands){ out.lo[k] = new Float64Array(n).fill(NaN); out.hi[k] = new Float64Array(n).fill(NaN); }
+  let off = 0;
+  for (const b of blks){
+    out.t.set(b.t, off);
+    for (const k in b.c) out.c[k].set(b.c[k], off);
+    for (const k in b.lo){ out.lo[k].set(b.lo[k], off); out.hi[k].set(b.hi[k], off); }
+    off += b.t.length;
+  }
+  if (S.concat.size > 12) S.concat.clear();
+  S.concat.set(key, out);
+  return out;
+}
+/* 依視窗長度挑解析度；需要的日檔還沒到就先用較粗的資料畫 */
+function pickBlock(){
+  const v = S.view, span = v.t1 - v.t0;
+  let lvl = wantLevel(span);
+  if (lvl === 'o') return {lvl, blk: S.ov, ready: true};
+  const days = daysIn(v.t0 - 60, v.t1 + 60);
+  if (lvl === 'r' && days.some(d => { const st = S.dayMap.get(d); return st && st.n > 0 && !st.raw; })) lvl = 'd';
+  const need = days.filter(d => { const st = S.dayMap.get(d); return !st || st.n > 0; });
+  const ents = need.map(d => loadDay(lvl, d));
+  if (ents.every(e => e.blk)) return {lvl, blk: concatBlocks(lvl + ':' + need.join(','), ents.map(e => e.blk)), ready: true};
+  if (lvl === 'r'){ const e2 = need.map(d => S.cache.d.get(d)); if (e2.every(e => e && e.blk)) return {lvl: 'd', blk: concatBlocks('d:' + need.join(','), e2.map(e => e.blk)), ready: false}; }
+  return {lvl: 'o', blk: S.ov, ready: false};
+}
+
+/* ───────────── 成本模型（與 arb/costs.py 同一套算法） ───────────── */
+function costOn(day){
+  const key = day + '|' + S.tier;
+  if (S.costCache.has(key)) return S.costCache.get(key);
+  const c = S.meta.costs; let conv = c.conv_default;
+  for (const s of c.conv_schedule) if ((s.from || '0') <= day && day <= (s.to || '9')){ conv = s.pct; break; }
+  const tier = c.tiers[S.tier] || c.tiers[c.tier];
+  const wd = 100 * c.withdraw_fee_twd / c.cycle_twd;
+  const beM = c.fx_cost_pct + conv + tier.maker + wd, beT = c.fx_cost_pct + conv + tier.taker + wd;
+  const fixed = S.tier === c.tier;
+  const o = {conv, beM, beT,
+    enter: fixed && c.enter_fixed != null ? c.enter_fixed : beM + c.enter_margin,
+    exit: fixed && c.exit_fixed != null ? c.exit_fixed : beM + c.exit_margin};
+  S.costCache.set(key, o); return o;
+}
+function isBizDay(day){ const wd = new Date(dayStart(day) * 1000 + TZO * 1000).getUTCDay(); return wd !== 0 && wd !== 6 && !S.holidays.has(day); }
+function isBank(ts){ const p = tw(ts), m = p.h * 60 + p.mi; return m >= S.meta.bank.open && m <= S.meta.bank.close && isBizDay(dayStr(ts)); }
+function costSegments(t0, t1){
+  const segs = []; let d = dayStr(t0), guard = 0;
+  while (guard++ < 4000){
+    const a = dayStart(d), b = a + DAY; if (a >= t1) break;
+    const c = costOn(d), last = segs[segs.length - 1];
+    if (last && last.c.beM === c.beM && last.c.beT === c.beT && last.c.enter === c.enter) last.b = Math.min(b, t1);
+    else segs.push({a: Math.max(a, t0), b: Math.min(b, t1), c});
+    d = dayStr(b + 3600);
+  }
+  return segs;
+}
+
+/* ───────────── 視窗控制 ───────────── */
+function dataEnd(){ return S.meta.t_last; }
+function setView(t0, t1, opt){
+  opt = opt || {};
+  const lo = S.meta.t_first, hi = dataEnd(), full = Math.max(600, hi - lo);
+  const span = clamp(t1 - t0, 300, full * 1.03);
+  if (span !== t1 - t0){ const c = (t0 + t1) / 2; t0 = c - span / 2; t1 = c + span / 2; }
+  const maxT1 = hi + span * 0.012, minT0 = lo - span * 0.012;      /* 兩端各留一點空白，不讓視窗跑出資料範圍 */
+  if (t1 > maxT1){ t1 = maxT1; t0 = t1 - span; }
+  if (t0 < minT0){ t0 = minT0; t1 = Math.min(maxT1, t0 + span); }
+  S.view.t0 = t0; S.view.t1 = t1;
+  S.view.preset = opt.preset || null;
+  S.view.follow = opt.follow != null ? opt.follow : (t1 >= hi - 2 * S.meta.interval_sec);
+  syncControls(); requestRender(); scheduleStats();
+}
+function applyPreset(key){
+  const p = PRESETS.find(x => x[0] === key) || PRESETS[3];
+  const lo = S.meta.t_first, hi = dataEnd();
+  if (p[0] === 'all') setView(lo - (hi - lo) * 0.006, hi + (hi - lo) * 0.012, {preset: 'all', follow: true});
+  else setView(hi + p[2] * 0.012 - p[2], hi + p[2] * 0.012, {preset: p[0], follow: true});
+  LS.set('preset', p[0]);
+}
+function zoomAt(t, f){ const v = S.view; setView(t - (t - v.t0) * f, t + (v.t1 - t) * f); }
+function panBy(dt){ const v = S.view; setView(v.t0 + dt, v.t1 + dt); }
+function syncControls(){
+  const v = S.view;
+  for (const b of $('presets').children) b.classList.toggle('on', b.dataset.p === v.preset);
+  $('latest').classList.toggle('on', v.follow);
+  if (document.activeElement !== $('from')) $('from').value = toInput(v.t0);
+  if (document.activeElement !== $('to')) $('to').value = toInput(Math.min(v.t1, dataEnd()));
+  writeHash();
+}
+let hashTimer = 0;
+function writeHash(){
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const v = S.view, parts = [];
+    if (v.follow && v.preset) parts.push('w=' + v.preset);
+    else { parts.push('f=' + Math.round(v.t0)); parts.push('t=' + Math.round(v.t1)); }
+    if (S.metric !== 'b3') parts.push('m=' + S.metric);
+    if (S.tier !== S.meta.costs.tier) parts.push('c=' + S.tier);
+    try { history.replaceState(null, '', '#' + parts.join('&')); } catch (e) {}
+  }, 250);
+}
+function readHash(){
+  const o = {}; location.hash.replace(/^#/, '').split('&').forEach(kv => { const i = kv.indexOf('='); if (i > 0) o[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+  return o;
+}
+
+/* ───────────── 畫布 ───────────── */
+function fit(cv, h){
+  const dpr = window.devicePixelRatio || 1, w = cv.parentNode.clientWidth;
+  const W = Math.round(w * dpr), H = Math.round(h * dpr);
+  if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+  cv.style.height = h + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {ctx, W: w, H: h};
+}
+function niceTicks(lo, hi, n){
+  const raw = (hi - lo) / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw))), nm = raw / mag;
+  const step = (nm < 1.5 ? 1 : nm < 3.5 ? 2 : nm < 7.5 ? 5 : 10) * mag, out = [];
+  for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + step * 1e-6; v += step) out.push(Math.abs(v) < step * 1e-6 ? 0 : v);
+  return {ticks: out, step};
+}
+const IVS = [60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, DAY, 2 * DAY, 7 * DAY, 14 * DAY, 28 * DAY];
+function xTicks(t0, t1, maxN){
+  const span = t1 - t0; let iv = IVS[IVS.length - 1];
+  for (const c of IVS) if (span / c <= maxN){ iv = c; break; }
+  const out = []; let t = Math.ceil((t0 + TZO) / iv) * iv - TZO, prev = '';
+  for (let g = 0; t <= t1 && g < 200; t += iv, g++){
+    const p = tw(t), dl = pad2(p.mo) + '/' + pad2(p.d);
+    if (iv >= DAY) out.push({t, a: dl, b: iv === DAY ? WD[p.wd] : ''});
+    else { out.push({t, a: pad2(p.h) + ':' + pad2(p.mi), b: dl !== prev ? dl + '（' + WD[p.wd] + '）' : ''}); prev = dl; }
+  }
+  return {ticks: out, iv};
+}
+/* 把可見資料壓成「每個像素欄一點」：平均＋最低＋最高，避免幾萬點擠成一團 */
+function columns(blk, key, i0, i1, X, x0, pw, useBand){
+  const t = blk.t, y = blk.c[key]; if (!y) return null;
+  const lo = useBand && blk.lo[key], hi = useBand && blk.hi[key];
+  const n = i1 - i0, direct = n <= pw * 1.5;
+  const px = [], av = [], mn = [], mx = [], tt = [];
+  if (direct){
+    for (let i = i0; i < i1; i++){ const v = y[i]; if (v !== v) continue; px.push(X(t[i])); av.push(v); tt.push(t[i]);
+      mn.push(lo && lo[i] === lo[i] ? lo[i] : v); mx.push(hi && hi[i] === hi[i] ? hi[i] : v); }
+  } else {
+    let cur = -1, s = 0, c = 0, a = 0, b = 0, ts = 0;
+    const flush = () => { if (c){ px.push(x0 + cur + 0.5); av.push(s / c); mn.push(a); mx.push(b); tt.push(ts / c); } };
+    for (let i = i0; i < i1; i++){ const v = y[i]; if (v !== v) continue;
+      const col = Math.floor(X(t[i]) - x0);
+      if (col !== cur){ flush(); cur = col; s = 0; c = 0; a = Infinity; b = -Infinity; ts = 0; }
+      s += v; c++; ts += t[i];
+      const l = lo && lo[i] === lo[i] ? lo[i] : v, h = hi && hi[i] === hi[i] ? hi[i] : v;
+      if (l < a) a = l; if (h > b) b = h; }
+    flush();
+  }
+  return {px, av, mn, mx, tt};
+}
+function drawSeries(ctx, col, Y, color, gap, band){
+  if (!col || !col.px.length) return;
+  const {px, av, mn, mx, tt} = col, n = px.length;
+  if (band){
+    ctx.fillStyle = color; ctx.globalAlpha = 0.16;
+    let s = 0;
+    for (let i = 1; i <= n; i++){
+      if (i === n || tt[i] - tt[i - 1] > gap){
+        ctx.beginPath();
+        for (let k = s; k < i; k++) k === s ? ctx.moveTo(px[k], Y(mx[k])) : ctx.lineTo(px[k], Y(mx[k]));
+        for (let k = i - 1; k >= s; k--) ctx.lineTo(px[k], Y(mn[k]));
+        ctx.closePath(); ctx.fill();
+        if (i - s === 1) ctx.fillRect(px[s] - 0.5, Y(mx[s]), 1, Math.max(1, Y(mn[s]) - Y(mx[s])));
+        s = i;
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i < n; i++){ if (i === 0 || tt[i] - tt[i - 1] > gap) ctx.moveTo(px[i], Y(av[i])); else ctx.lineTo(px[i], Y(av[i])); }
+  ctx.stroke();
+}
+
+/* ───────────── 面板定義 ───────────── */
+const PANELS = [
+  {id: 'prem', title: () => '溢價（%）— ' + METRICS[S.metric].short, h: 340, fmt: 'pct', on: () => true,
+    series: () => { const m = METRICS[S.metric], a = [{k: m.bito, name: 'BitoPro', color: css('--bito'), band: true}]; if (S.show.max) a.push({k: m.max, name: 'MAX', color: css('--max')}); return a; }, thr: true},
+  {id: 'fx', title: () => 'USD/TWD 中間價', h: 190, fmt: 'fx', on: () => S.show.fx, series: () => [{k: 'fx', name: '匯率', color: css('--fx')}]},
+  {id: 'depth', title: () => '±0.1% 買盤深度（USDT）', h: 190, fmt: 'int', on: () => S.show.depth, zero: true,
+    series: () => { const a = [{k: 'db', name: 'BitoPro', color: css('--bito')}]; if (S.show.max) a.push({k: 'dx', name: 'MAX', color: css('--max')}); return a; }},
+  {id: 'diff', title: () => '扣費後淨價差 MAX − BitoPro（%，正＝MAX 較優）', h: 190, fmt: 'pct', on: () => S.show.diff, zero: true,
+    series: () => [{k: 'dt', name: 'taker 基準', color: css('--dt')}, {k: 'dm', name: 'maker 基準', color: css('--dm')}]}
+];
+function buildPanels(){
+  const host = $('panels'); host.innerHTML = '';
+  for (const p of PANELS){
+    const sec = document.createElement('section'); sec.className = 'card'; sec.id = 'sec-' + p.id;
+    sec.innerHTML = '<div class="phead"><span class="pt"></span><span class="pl"></span></div><div class="cvbox"><canvas></canvas><canvas class="ovl"></canvas></div>';
+    host.appendChild(sec);
+    p.sec = sec; p.pt = sec.querySelector('.pt'); p.pl = sec.querySelector('.pl');
+    p.cv = sec.querySelectorAll('canvas')[0]; p.ovl = sec.querySelectorAll('canvas')[1];
+    attachPanelEvents(p);
+  }
+}
+/* 所有面板共用同一組左右邊界，時間軸才會上下對齊；桌機右側留一欄放門檻與最新值標籤 */
+function geom(W){ const narrow = W < 640; return {l: narrow ? 46 : 60, r: narrow ? 6 : 92, t: 8, b: 30}; }
+function sideTags(ctx, tags, x, top, bottom){
+  tags = tags.filter(a => a.y === a.y && a.y >= top - 2 && a.y <= bottom + 2).sort((a, b) => a.y - b.y);
+  let last = -99;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  for (const a of tags){ const y = Math.max(a.y, last + 12.5); last = y; ctx.font = (a.bold ? '600 ' : '') + '11px system-ui'; ctx.fillStyle = a.color; ctx.fillText(a.txt, x, y); }
+}
+function yFmt(fmt, step){
+  if (fmt === 'pct'){ const n = step < 0.01 ? 3 : 2; return v => (v > 0 ? '+' : '') + v.toFixed(n) + '%'; }
+  if (fmt === 'fx'){ const n = step < 0.01 ? 3 : 2; return v => v.toFixed(n); }
+  return v => Math.abs(v) >= 10000 ? (v / 1000).toFixed(step < 1000 ? 1 : 0) + 'k' : Math.round(v).toLocaleString('en-US');
+}
+function drawPanel(p, blk){
+  const on = p.on(); p.sec.style.display = on ? '' : 'none'; if (!on) return;
+  const {ctx, W, H} = fit(p.cv, p.h); fit(p.ovl, p.h);
+  const g = geom(W), pw = W - g.l - g.r, ph = H - g.t - g.b, v = S.view;
+  const X = t => g.l + (t - v.t0) / (v.t1 - v.t0) * pw;
+  p.g = g; p.pw = pw; p.ph = ph; p.W = W; p.H = H;
+  ctx.clearRect(0, 0, W, H);
+  const ser = p.series(); p.ser = ser; p.pt.textContent = p.title();
+  const t = blk.t, i0 = Math.max(0, lowerBound(t, v.t0) - 1), i1 = Math.min(t.length, lowerBound(t, v.t1) + 1);
+  const gap = Math.max(blk.step * 3.5, 150, (v.t1 - v.t0) / pw * 3);
+  const cols = ser.map(s => columns(blk, s.k, i0, i1, X, g.l, pw, !!s.band));
+  let lo = Infinity, hi = -Infinity;
+  cols.forEach((c, k) => { if (!c) return; const useBand = ser[k].band; for (let i = 0; i < c.px.length; i++){ const a = useBand ? c.mn[i] : c.av[i], b = useBand ? c.mx[i] : c.av[i]; if (a < lo) lo = a; if (b > hi) hi = b; } });
+  const segs = p.thr ? costSegments(v.t0, v.t1) : [];
+  for (const s of segs){ lo = Math.min(lo, s.c.beM); hi = Math.max(hi, s.c.enter); }
+  if (p.zero){ lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  if (!isFinite(lo)){ lo = 0; hi = 1; }
+  if (hi - lo < 1e-9){ hi += Math.abs(hi) * 0.001 + 0.01; lo -= Math.abs(lo) * 0.001 + 0.01; }
+  const padY = (hi - lo) * 0.08; lo -= p.zero && lo === 0 ? 0 : padY; hi += padY;
+  const Y = val => g.t + (hi - val) / (hi - lo) * ph;
+  p.Y = Y; p.lo = lo; p.hi = hi;
+  /* 營業時段底色 */
+  const pxDay = pw / ((v.t1 - v.t0) / DAY);
+  if (pxDay >= 2){
+    let d = dayStr(v.t0), guard = 0;
+    while (guard++ < 800){
+      const a = dayStart(d); if (a >= v.t1) break;
+      const biz = isBizDay(d);
+      if (pxDay >= 7 && biz){
+        const o = a + S.meta.bank.open * 60, c = a + S.meta.bank.close * 60, x1 = Math.max(g.l, X(o)), x2 = Math.min(g.l + pw, X(c));
+        if (x2 > x1){ ctx.fillStyle = css('--bank'); ctx.fillRect(x1, g.t, x2 - x1, ph); }
+        if (pxDay >= 260 && p.id === 'prem'){ const w = a + S.meta.bank.cutoff * 60, x = X(w);
+          if (x > g.l && x < g.l + pw){ ctx.strokeStyle = css('--max'); ctx.setLineDash([3, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, g.t); ctx.lineTo(x, g.t + ph); ctx.stroke(); ctx.setLineDash([]);
+            const right = x + 86 > g.l + pw; ctx.fillStyle = css('--max'); ctx.font = '10.5px system-ui'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = right ? 'right' : 'left';
+            ctx.fillText('出金截止 ' + pad2(S.meta.bank.cutoff / 60 | 0) + ':' + pad2(S.meta.bank.cutoff % 60), x + (right ? -4 : 4), g.t + 11); } }
+      } else if (!biz){     /* 週末／國定假日：整天淡灰，一眼看出銀行沒開 */
+        const x1 = Math.max(g.l, X(a)), x2 = Math.min(g.l + pw, X(a + DAY));
+        if (x2 > x1){ ctx.fillStyle = css('--hol'); ctx.fillRect(x1, g.t, x2 - x1, ph); }
+      }
+      d = dayStr(a + DAY + 3600);
+    }
+  }
+  /* 格線與座標 */
+  const yt = niceTicks(lo, hi, Math.max(3, Math.round(ph / 46))), yf = yFmt(p.fmt, yt.step);
+  ctx.font = '11px system-ui'; ctx.textBaseline = 'middle'; ctx.lineWidth = 1;
+  for (const val of yt.ticks){ const y = Math.round(Y(val)) + 0.5; ctx.strokeStyle = css('--grid'); ctx.beginPath(); ctx.moveTo(g.l, y); ctx.lineTo(g.l + pw, y); ctx.stroke();
+    ctx.fillStyle = css('--axis'); ctx.textAlign = 'right'; ctx.fillText(yf(val), g.l - 6, y); }
+  const xt = xTicks(v.t0, v.t1, Math.max(3, Math.floor(pw / 86)));
+  ctx.textBaseline = 'alphabetic';
+  for (const k of xt.ticks){ const x = Math.round(X(k.t)) + 0.5; ctx.strokeStyle = css('--grid'); ctx.beginPath(); ctx.moveTo(x, g.t); ctx.lineTo(x, g.t + ph); ctx.stroke();
+    ctx.strokeStyle = css('--axis'); ctx.beginPath(); ctx.moveTo(x, g.t + ph); ctx.lineTo(x, g.t + ph + 4); ctx.stroke();
+    ctx.fillStyle = css('--axis'); ctx.textAlign = 'center'; ctx.fillText(k.a, x, g.t + ph + 15);
+    if (k.b){ ctx.fillStyle = css('--muted'); ctx.fillText(k.b, clamp(x, g.l + 30, g.l + pw - 30), g.t + ph + 27); } }
+  if (p.zero || (lo < 0 && hi > 0)){ const y = Math.round(Y(0)) + 0.5; if (y > g.t && y < g.t + ph){ ctx.strokeStyle = css('--axis'); ctx.beginPath(); ctx.moveTo(g.l, y); ctx.lineTo(g.l + pw, y); ctx.stroke(); } }
+  ctx.strokeStyle = css('--line'); ctx.strokeRect(g.l + 0.5, g.t + 0.5, pw, ph);
+  /* 損平／門檻階梯線 */
+  ctx.save(); ctx.beginPath(); ctx.rect(g.l, g.t, pw, ph); ctx.clip();
+  if (p.thr){
+    const lines = [['beT', css('--bet'), [2, 4]], ['beM', css('--be'), [6, 4]], ['enter', css('--enter'), [6, 4]]];
+    for (const [key, color, dash] of lines){
+      ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.setLineDash(dash); ctx.beginPath();
+      segs.forEach((s, i) => { const y = Y(s.c[key]); if (i === 0) ctx.moveTo(X(s.a), y); else ctx.lineTo(X(s.a), y); ctx.lineTo(X(s.b), y); });
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  /* 資料線 */
+  cols.forEach((c, k) => drawSeries(ctx, c, Y, ser[k].color, gap, !!ser[k].band && c && c.px.some((_, i) => Y(c.mn[i]) - Y(c.mx[i]) > 1.5)));
+  /* 警報標記（視窗短時才畫，避免雜亂） */
+  if (p.id === 'prem' && pxDay >= 120){
+    for (const a of S.meta.alerts){ if (a[0] < v.t0 || a[0] > v.t1 || a[1] === 'reverse' || a[2] == null) continue;
+      const x = X(a[0]), y = Y(a[2]); ctx.fillStyle = a[1] === 'enter' ? css('--ok') : css('--muted'); ctx.beginPath();
+      if (a[1] === 'enter'){ ctx.moveTo(x, y - 9); ctx.lineTo(x - 5, y - 17); ctx.lineTo(x + 5, y - 17); } else { ctx.moveTo(x, y + 9); ctx.lineTo(x - 5, y + 17); ctx.lineTo(x + 5, y + 17); }
+      ctx.closePath(); ctx.fill(); }
+  }
+  ctx.restore();
+  if (g.r >= 60){     /* 右側標籤欄：門檻線的數值＋每條線在視窗最右端的值 */
+    const tags = [];
+    if (p.thr && segs.length){ const c = segs[segs.length - 1].c;
+      tags.push({y: Y(c.enter), txt: '進場 ' + c.enter.toFixed(3) + '%', color: css('--enter')}, {y: Y(c.beT), txt: 'taker ' + c.beT.toFixed(3) + '%', color: css('--be')}, {y: Y(c.beM), txt: 'maker ' + c.beM.toFixed(3) + '%', color: css('--be')}); }
+    cols.forEach((c, k) => { if (c && c.px.length){ const j = c.px.length - 1; if (c.px[j] > g.l + pw - 40) tags.push({y: Y(c.av[j]), txt: p.fmt === 'pct' ? fPct(c.av[j]) : p.fmt === 'fx' ? c.av[j].toFixed(3) : fInt(c.av[j]), color: ser[k].color, bold: true}); } });
+    sideTags(ctx, tags, g.l + pw + 6, g.t + 6, g.t + ph - 4);
+  }
+  p.cols = cols;
+  legend(p, blk);
+}
+function nearest(blk, tq){ const t = blk.t; if (!t.length) return -1; let i = lowerBound(t, tq); if (i >= t.length) i = t.length - 1; if (i > 0 && Math.abs(t[i - 1] - tq) < Math.abs(t[i] - tq)) i--; return i; }
+function fmtVal(fmt, v){ return fmt === 'pct' ? fPct(v) : fmt === 'fx' ? fFx(v) : fInt(v); }
+function legend(p, blk){
+  const v = S.view; let i = -1, tq = S.hover;
+  if (tq != null) i = nearest(blk, tq);
+  else { i = Math.min(blk.t.length - 1, lowerBound(blk.t, v.t1)); while (i > 0 && blk.t[i] > v.t1) i--; }
+  let html = '';
+  if (i >= 0 && blk.t.length){
+    const when = fmtT(blk.t[i], blk.step < 60);
+    html += '<span>' + (tq != null ? '' : '最新 ') + when + (blk.step >= 60 ? '（' + fSpan(blk.step) + '均）' : '') + '</span>';
+    for (const s of p.ser){ const arr = blk.c[s.k]; let val = arr ? arr[i] : NaN;
+      if (tq == null && val !== val && arr){ let j = i; while (j > 0 && arr[j] !== arr[j]) j--; val = arr[j]; }
+      let extra = ''; if (s.band && blk.lo[s.k] && blk.lo[s.k][i] === blk.lo[s.k][i] && blk.step >= 60) extra = '（' + fPct(blk.lo[s.k][i], 2) + '～' + fPct(blk.hi[s.k][i], 2) + '）';
+      html += '<span><i class="sw" style="background:' + s.color + '"></i>' + s.name + ' <b>' + fmtVal(p.fmt, val) + '</b>' + extra + '</span>'; }
+    if (p.thr){ const c = costOn(dayStr(blk.t[i])); html += '<span>損平 maker ' + c.beM.toFixed(3) + '% / taker ' + c.beT.toFixed(3) + '% · 進場 ' + c.enter.toFixed(3) + '%</span>'; }
+  }
+  p.pl.innerHTML = html;
+}
+function drawOverlay(p){
+  if (!p.on() || !p.g) return;
+  const ctx = p.ovl.getContext('2d'), dpr = window.devicePixelRatio || 1; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, p.W, p.H);
+  const g = p.g, v = S.view, X = t => g.l + (t - v.t0) / (v.t1 - v.t0) * p.pw;
+  if (S.drag && S.drag.mode === 'select'){ const a = Math.min(S.drag.x0, S.drag.x1), b = Math.max(S.drag.x0, S.drag.x1); ctx.fillStyle = css('--sel'); ctx.fillRect(a, g.t, b - a, p.ph); ctx.strokeStyle = css('--accent'); ctx.strokeRect(a + 0.5, g.t + 0.5, b - a, p.ph); }
+  if (S.hover != null && S.blk){
+    const i = nearest(S.blk, S.hover); if (i < 0) return; const x = X(S.blk.t[i]); if (x < g.l || x > g.l + p.pw) return;
+    ctx.strokeStyle = css('--axis'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, g.t); ctx.lineTo(Math.round(x) + 0.5, g.t + p.ph); ctx.stroke(); ctx.setLineDash([]);
+    for (const s of p.ser){ const arr = S.blk.c[s.k], val = arr ? arr[i] : NaN; if (val !== val) continue; const y = p.Y(val); if (y < g.t || y > g.t + p.ph) continue;
+      ctx.fillStyle = s.color; ctx.strokeStyle = css('--card'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 3.6, 0, 6.3); ctx.fill(); ctx.stroke(); }
+  }
+}
+
+/* ───────────── 全期間總覽（選視窗） ───────────── */
+const OV = {h: 66, g: {l: 60, r: 12, t: 4, b: 16}};
+function ovGeom(){ const W = $('ov').parentNode.clientWidth, g = geom(W); OV.g.l = g.l; OV.g.r = g.r; return {W, pw: W - OV.g.l - OV.g.r, ph: OV.h - OV.g.t - OV.g.b}; }
+function ovRange(){ const a = S.meta.t_first, b = dataEnd(); return {a, b: b + (b - a) * 0.012}; }
+function drawOv(){
+  const cv = $('ov'), {ctx, W, H} = fit(cv, OV.h), {pw, ph} = ovGeom(), g = OV.g, r = ovRange(), blk = S.ov;
+  const X = t => g.l + (t - r.a) / (r.b - r.a) * pw;
+  ctx.clearRect(0, 0, W, H);
+  const pxDay = pw / ((r.b - r.a) / DAY);
+  if (pxDay >= 2){ let d = dayStr(r.a), guard = 0; while (guard++ < 2000){ const a = dayStart(d); if (a >= r.b) break; if (!isBizDay(d)){ const x1 = Math.max(g.l, X(a)), x2 = Math.min(g.l + pw, X(a + DAY)); ctx.fillStyle = css('--hol'); ctx.fillRect(x1, g.t, x2 - x1, ph); } d = dayStr(a + DAY + 3600); } }
+  const key = METRICS[S.metric].bito, col = columns(blk, key, 0, blk.t.length, X, g.l, pw, true);
+  if (col && col.px.length){
+    let lo = Infinity, hi = -Infinity; for (let i = 0; i < col.px.length; i++){ if (col.av[i] < lo) lo = col.av[i]; if (col.av[i] > hi) hi = col.av[i]; }
+    const c0 = costOn(dayStr(dataEnd())); lo = Math.min(lo, c0.beM); hi = Math.max(hi, c0.beM);
+    const pd = (hi - lo) * 0.1 || 0.1; lo -= pd; hi += pd; const Y = val => g.t + (hi - val) / (hi - lo) * ph;
+    const gap = Math.max(blk.step * 3.5, (r.b - r.a) / pw * 3);
+    const segs = costSegments(r.a, r.b); ctx.strokeStyle = css('--be'); ctx.setLineDash([4, 3]); ctx.lineWidth = 1; ctx.beginPath();
+    segs.forEach((s, i) => { const y = Y(s.c.beM); if (i === 0) ctx.moveTo(X(s.a), y); else ctx.lineTo(X(s.a), y); ctx.lineTo(X(s.b), y); }); ctx.stroke(); ctx.setLineDash([]);
+    const flat = {px: col.px, av: col.av, mn: col.av, mx: col.av, tt: col.tt}; drawSeries(ctx, flat, Y, css('--bito'), gap, false);
+    ctx.fillStyle = css('--axis'); ctx.font = '10.5px system-ui'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(fPct(hi - pd, 2), g.l - 6, g.t + 6); ctx.fillText(fPct(lo + pd, 2), g.l - 6, g.t + ph - 5);
+  }
+  const xt = xTicks(r.a, r.b, Math.max(3, Math.floor(pw / 80))); ctx.font = '10.5px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = css('--axis');
+  for (const k of xt.ticks){ const x = X(k.t); ctx.fillText(xt.iv >= DAY ? k.a : (k.b ? k.b.slice(0, 5) : k.a), x, H - 3); }
+  const v = S.view, x1 = clamp(X(v.t0), g.l, g.l + pw), x2 = clamp(X(v.t1), g.l, g.l + pw), w = Math.max(3, x2 - x1);
+  ctx.fillStyle = css('--sel'); ctx.fillRect(x1, g.t, w, ph);
+  ctx.strokeStyle = css('--accent'); ctx.lineWidth = 1.5; ctx.strokeRect(x1 + 0.5, g.t + 0.5, w - 1, ph - 1);
+  ctx.fillStyle = css('--accent'); ctx.fillRect(x1 - 1.5, g.t + ph / 2 - 9, 4, 18); ctx.fillRect(x1 + w - 2.5, g.t + ph / 2 - 9, 4, 18);
+  if (OV.drag && OV.drag.mode === 'new'){ const a = Math.min(OV.drag.x0, OV.drag.x1), b = Math.max(OV.drag.x0, OV.drag.x1); ctx.fillStyle = css('--sel'); ctx.fillRect(a, g.t, b - a, ph); }
+}
+function attachOvEvents(){
+  const cv = $('ov');
+  const tAt = x => { const {pw} = ovGeom(), r = ovRange(); return r.a + (x - OV.g.l) / pw * (r.b - r.a); };
+  const xAt = t => { const {pw} = ovGeom(), r = ovRange(); return OV.g.l + (t - r.a) / (r.b - r.a) * pw; };
+  const pos = e => e.clientX - cv.getBoundingClientRect().left;
+  const mode = x => { const a = xAt(S.view.t0), b = xAt(S.view.t1); if (Math.abs(x - a) <= 8) return 'l'; if (Math.abs(x - b) <= 8) return 'r'; if (x > a && x < b) return 'move'; return 'new'; };
+  cv.addEventListener('pointerdown', e => { const x = pos(e); OV.drag = {mode: mode(x), x0: x, x1: x, t0: S.view.t0, t1: S.view.t1, moved: false}; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; e.preventDefault(); });
+  cv.addEventListener('pointermove', e => {
+    const x = pos(e), d = OV.drag;
+    if (!d){ const m = mode(x); cv.style.cursor = m === 'l' || m === 'r' ? 'ew-resize' : m === 'move' ? 'grab' : 'crosshair'; return; }
+    d.x1 = x; if (Math.abs(x - d.x0) > 3) d.moved = true;
+    const dt = tAt(x) - tAt(d.x0);
+    if (d.mode === 'move') setView(d.t0 + dt, d.t1 + dt, {follow: false});
+    else if (d.mode === 'l') setView(Math.min(d.t0 + dt, d.t1 - 300), d.t1, {follow: S.view.follow});
+    else if (d.mode === 'r') setView(d.t0, Math.max(d.t1 + dt, d.t0 + 300), {follow: false});
+    else requestRender();
+  });
+  const end = e => { const d = OV.drag; if (!d) return; OV.drag = null; cv.style.cursor = 'grab';
+    if (d.mode === 'new'){ if (d.moved && Math.abs(d.x1 - d.x0) > 6) setView(tAt(Math.min(d.x0, d.x1)), tAt(Math.max(d.x0, d.x1)), {follow: false}); else { const span = S.view.t1 - S.view.t0, c = tAt(d.x1); setView(c - span / 2, c + span / 2, {follow: false}); } }
+    else setView(S.view.t0, S.view.t1); requestRender(); };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); const t = tAt(pos(e)); zoomAt(clamp(t, S.view.t0, S.view.t1), e.deltaY > 0 ? 1.25 : 0.8); }, {passive: false});
+}
+
+/* ───────────── 圖上的互動 ───────────── */
+const PTRS = new Map();
+function attachPanelEvents(p){
+  const el = p.ovl;
+  const pos = e => e.clientX - el.getBoundingClientRect().left;
+  const tAt = x => S.view.t0 + (x - p.g.l) / p.pw * (S.view.t1 - S.view.t0);
+  const inPlot = x => p.g && x >= p.g.l && x <= p.g.l + p.pw;
+  el.addEventListener('pointerdown', e => {
+    if (!p.g) return; const x = pos(e); PTRS.set(e.pointerId, x); el.setPointerCapture(e.pointerId);
+    if (PTRS.size === 2){ const xs = [...PTRS.values()]; S.drag = {mode: 'pinch', d0: Math.abs(xs[0] - xs[1]) || 1, c: tAt((xs[0] + xs[1]) / 2), t0: S.view.t0, t1: S.view.t1, p}; return; }
+    const pan = e.pointerType !== 'mouse' || e.shiftKey || e.button === 1;
+    S.drag = {mode: pan ? 'pan' : 'select', x0: x, x1: x, t0: S.view.t0, t1: S.view.t1, p};
+    if (e.pointerType === 'mouse') e.preventDefault();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!p.g) return; const x = pos(e); if (PTRS.has(e.pointerId)) PTRS.set(e.pointerId, x);
+    const d = S.drag;
+    if (d && d.mode === 'pinch' && PTRS.size >= 2){ const xs = [...PTRS.values()], f = d.d0 / (Math.abs(xs[0] - xs[1]) || 1); setView(d.c - (d.c - d.t0) * f, d.c + (d.t1 - d.c) * f, {follow: false}); return; }
+    if (d && d.mode === 'pan'){ const dt = (d.x0 - x) / p.pw * (d.t1 - d.t0); setView(d.t0 + dt, d.t1 + dt); S.hover = null; return; }
+    if (d && d.mode === 'select'){ d.x1 = clamp(x, p.g.l, p.g.l + p.pw); d.x0 = clamp(d.x0, p.g.l, p.g.l + p.pw); overlays(); return; }
+    S.hover = inPlot(x) ? tAt(x) : null; overlays(true);
+  });
+  const end = e => {
+    PTRS.delete(e.pointerId); const d = S.drag; if (!d) return;
+    if (d.mode === 'pinch'){ if (PTRS.size < 2) S.drag = null; return; }
+    S.drag = null;
+    if (d.mode === 'select' && Math.abs(d.x1 - d.x0) > 8){ const a = tAt(Math.min(d.x0, d.x1)), b = tAt(Math.max(d.x0, d.x1)); setView(a, b, {follow: false}); }
+    else if (d.mode === 'pan') setView(S.view.t0, S.view.t1);
+    overlays();
+  };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('pointerleave', e => { if (!S.drag){ S.hover = null; overlays(true); } });
+  el.addEventListener('dblclick', e => { const x = pos(e); if (inPlot(x)) zoomAt(tAt(x), 2); });
+  el.addEventListener('wheel', e => {
+    if (!p.g) return;
+    if (e.ctrlKey || e.metaKey){ e.preventDefault(); const x = pos(e); zoomAt(tAt(clamp(x, p.g.l, p.g.l + p.pw)), e.deltaY > 0 ? 1.2 : 1 / 1.2); }
+    else if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.2){ e.preventDefault(); panBy(e.deltaX / p.pw * (S.view.t1 - S.view.t0)); }
+  }, {passive: false});
+}
+function overlays(withLegend){ for (const p of PANELS){ drawOverlay(p); if (withLegend && p.on() && S.blk) legend(p, S.blk); } }
+
+/* ───────────── 繪製排程 ───────────── */
+let rafId = 0;
+function requestRender(){ if (!rafId) rafId = requestAnimationFrame(render); }
+function render(){
+  rafId = 0; if (!S.meta || !S.ov || !S.view.t1) return;
+  readPalette();
+  const pick = pickBlock(); S.blk = pick.blk; S.level = pick.lvl;
+  const span = S.view.t1 - S.view.t0, want = wantLevel(span);
+  const names = {r: '原始 ' + S.meta.interval_sec + ' 秒', d: '1 分鐘均值', o: fSpan(S.ov.step) + '均值'};
+  $('resnote').textContent = '視窗 ' + fSpan(span) + ' · 解析度：' + names[pick.lvl] + (pick.ready ? '' : '（細資料載入中…）') + (want === 'r' && pick.ready && pick.lvl === 'd' ? '（此區間的 15 秒原始檔已超過保留天數）' : '');
+  for (const p of PANELS) drawPanel(p, pick.blk);
+  drawOv(); overlays();
+}
+let statTimer = 0;
+function scheduleStats(){ clearTimeout(statTimer); statTimer = setTimeout(() => { renderStats(); markDaily(); }, 180); }
+
+/* ───────────── 統計 ───────────── */
+function histShare(h, thr){ const H = S.meta.hist; let tot = 0, above = 0; const pos = (thr - H.lo) / H.step;
+  for (let i = 0; i < h.length; i++){ tot += h[i]; if (i >= pos) above += h[i]; else if (i + 1 > pos) above += h[i] * (i + 1 - pos); }
+  return {tot, above}; }
+function allDays(){ return S.days.concat(S.meta.today || []); }
+function renderStats(){
+  const v = S.view, m = METRICS[S.metric], span = v.t1 - v.t0, el = $('wstats');
+  $('wtitle').textContent = '視窗統計 — ' + fmtT(v.t0) + ' ～ ' + fmtT(Math.min(v.t1, dataEnd())) + '（' + fSpan(span) + '）';
+  const out = [], add = (k, val, cls) => out.push('<div>' + k + '<b' + (cls ? ' class="' + cls + '"' : '') + '>' + val + '</b></div>');
+  const pick = pickBlock(), blk = pick.blk, t = blk.t, y = blk.c[m.bito] || [], ym = blk.c[m.max] || [], fx = blk.c.fx || [];
+  const ylo = blk.lo[m.bito], yhi = blk.hi[m.bito];
+  const i0 = lowerBound(t, v.t0), i1 = lowerBound(t, v.t1);
+  /* A＝全時段、B＝銀行時段；n 筆數、s 總和、m/k/e＝≥ 損平 maker／taker／進場門檻 的筆數 */
+  let A = {n: 0, s: 0, m: 0, k: 0, e: 0}, B = {n: 0, s: 0, m: 0, k: 0, e: 0};
+  let mx = -Infinity, mn = Infinity, sm = 0, nm = 0, fx0 = NaN, fx1 = NaN;
+  for (let i = i0; i < i1; i++){
+    if (fx[i] === fx[i]){ if (fx0 !== fx0) fx0 = fx[i]; fx1 = fx[i]; }
+    if (ym[i] === ym[i]){ sm += ym[i]; nm++; }
+    const val = y[i]; if (val !== val) continue;
+    const c = costOn(dayStr(t[i]));
+    const h = yhi && yhi[i] === yhi[i] ? yhi[i] : val, l = ylo && ylo[i] === ylo[i] ? ylo[i] : val;
+    if (h > mx) mx = h; if (l < mn) mn = l;
+    for (const g of (isBank(t[i]) ? [A, B] : [A])){ g.n++; g.s += val; if (val >= c.beM) g.m++; if (val >= c.beT) g.k++; if (val >= c.enter) g.e++; }
+  }
+  const avgA = A.n ? A.s / A.n : NaN, avgB = B.n ? B.s / B.n : NaN;
+  const pc = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : '—';
+  let note = '以圖上目前的解析度（' + (pick.lvl === 'r' ? '原始資料' : pick.lvl === 'd' ? '1 分鐘均值' : fSpan(S.ov.step) + '均值') + '）計算。';
+  if (pick.lvl === 'o' && (S.metric === 'b3' || S.metric === 'bb')){
+    /* 長視窗：時間占比改用各日「逐筆資料的分佈」，才不會被 15 分鐘平均抹平（以視窗涵蓋到的整日計） */
+    const hk = S.metric === 'b3' ? 'h3' : 'hb'; let nd = 0;
+    A = {n: 0, m: 0, k: 0, e: 0}; B = {n: 0, m: 0, k: 0, e: 0};
+    for (const d of allDays()){
+      if (!d.n) continue; const a = dayStart(d.d); if (a + DAY <= v.t0 || a >= v.t1) continue; nd++;
+      const c = costOn(d.d);
+      for (const [g, h] of [[A, d[hk]], [B, d[hk + 'b']]]){ const rm = histShare(h, c.beM); g.n += rm.tot; g.m += rm.above; g.k += histShare(h, c.beT).above; g.e += histShare(h, c.enter).above; }
+    }
+    note = '時間占比以視窗涵蓋到的 ' + nd + ' 個整日、逐筆資料的分佈計算；平均值為圖上 ' + fSpan(S.ov.step) + '均值的平均。';
+  }
+  add('BitoPro 平均（' + m.short + '）', fPct(avgA));
+  add('最高 / 最低', isFinite(mx) ? fPct(mx, 2) + ' / ' + fPct(mn, 2) : '—');
+  add('銀行時段平均', fPct(avgB));
+  add('銀行時段 ≥ 損平 maker', pc(B.m, B.n));
+  add('銀行時段 ≥ 損平 taker', pc(B.k, B.n));
+  add('銀行時段 ≥ 進場門檻', pc(B.e, B.n));
+  add('全時段 ≥ 損平 maker', pc(A.m, A.n));
+  add('MAX 平均（' + m.short + '）', fPct(nm ? sm / nm : NaN));
+  add('匯率 起 → 迄', fx0 === fx0 ? fx0.toFixed(3) + ' → ' + fx1.toFixed(3) + '（' + fPct((fx1 / fx0 - 1) * 100, 2) + '）' : '—');
+  el.innerHTML = out.join('');
+  const c = costOn(dayStr(Math.min(v.t1, dataEnd())));
+  $('wnote').textContent = note + ' 成本情境「' + (S.meta.costs.tiers[S.tier] || {}).label + '」，視窗最後一天：美元換 U ' + c.conv + '%、損平 maker ' + c.beM.toFixed(3) + '% / taker ' + c.beT.toFixed(3) + '%、進場門檻 ' + c.enter.toFixed(3) + '%。';
+}
+function renderDaily(){
+  const hk = S.metric === 'bb' ? 'hb' : 'h3', lab = S.metric === 'bb' ? 'bid1' : 'vwap30k';
+  $('daily').querySelector('thead').innerHTML = '<tr><th>日期</th><th>全日平均</th><th>最高</th><th>銀行時段平均</th><th>銀行時段 ≥ 損平 maker</th><th>≥ 進場門檻（分）</th><th>損平 maker</th><th>匯率收</th><th>匯率日變動</th><th>深度中位</th></tr>';
+  const rows = [], ds = allDays(); let prevFx = null; const chg = new Map();
+  for (const d of ds){ if (d.fxc != null){ if (prevFx != null) chg.set(d.d, (d.fxc / prevFx - 1) * 100); prevFx = d.fxc; } }
+  for (let i = ds.length - 1; i >= 0; i--){
+    const d = ds[i], p = tw(dayStart(d.d) + 43200), name = d.d.slice(5).replace('-', '/') + '（' + WD[p.wd] + '）' + (!d.biz && p.wd !== 0 && p.wd !== 6 ? ' 休' : '');
+    if (!d.n){ rows.push('<tr class="off" data-d="' + d.d + '"><td>' + name + '</td><td colspan="9" style="text-align:left">無資料</td></tr>'); continue; }
+    const c = costOn(d.d); let shareTxt = '—', minTxt = '—', w = -1;
+    if (d.biz && d[hk + 'b']){ const r = histShare(d[hk + 'b'], c.beM), e = histShare(d[hk + 'b'], c.enter); if (r.tot){ w = 100 * r.above / r.tot; shareTxt = w.toFixed(0) + '%'; minTxt = Math.round(e.above * S.meta.interval_sec / 60) + ''; } }
+    rows.push('<tr class="' + (d.biz ? '' : 'off') + '" data-d="' + d.d + '"><td>' + name + '</td><td>' + fPct(d.avg) + '</td><td>' + fPct(d.max, 2) + '</td><td>' + (d.biz ? fPct(S.metric === 'bb' ? d.bbavg : d.bavg) : '—') + '</td>'
+      + '<td class="bar">' + (w > 0 ? '<i style="width:' + w.toFixed(0) + '%"></i>' : '') + '<span>' + shareTxt + '</span></td><td>' + minTxt + '</td><td>' + c.beM.toFixed(3) + '%</td><td>' + (d.fxc == null ? '—' : d.fxc.toFixed(3)) + '</td><td>' + (chg.has(d.d) ? fPct(chg.get(d.d), 2) : '—') + '</td><td>' + fInt(d.dep) + '</td></tr>');
+  }
+  $('daily').querySelector('tbody').innerHTML = rows.join('');
+  $('dnote').textContent = '全日平均／最高以 vwap30k 計；銀行時段欄位以 ' + lab + ' 計，並依當天的手續費與所選成本情境判斷損平。灰色列＝週末或國定假日（銀行不開，無法結匯）。';
+  markDaily();
+}
+function markDaily(){ const v = S.view; for (const tr of $('daily').querySelectorAll('tbody tr')){ const a = dayStart(tr.dataset.d); tr.classList.toggle('cur', a < v.t1 && a + DAY > v.t0 && (v.t1 - v.t0) <= 2.5 * DAY); } }
+function renderAlerts(){
+  const name = {enter: '🟢 進場', exit: '⚪ 退出', reverse: '🔴 反向'}, a = S.meta.alerts.slice(-60).reverse();
+  $('alerts').querySelector('tbody').innerHTML = a.length ? a.map(x => '<tr data-t="' + x[0] + '"><td>' + fmtT(x[0], true) + '</td><td>' + (name[x[1]] || x[1]) + '</td><td>' + fPct(x[2]) + '</td></tr>').join('') : '<tr><td colspan="3" style="text-align:left" class="muted">尚無警報</td></tr>';
+}
+function renderTiles(){
+  const L = S.meta.last, m = METRICS[S.metric], c = costOn(dayStr(L.ts)), cyc = S.meta.costs.cycle_twd;
+  const mk = L.ba != null ? L.ba - c.beM : null, tk = L[m.bito] != null ? L[m.bito] - c.beT : null;
+  const cls = x => x == null ? '' : x >= 0 ? 'pos' : 'neg', twd = x => x == null ? '' : '≈ ' + (x >= 0 ? '+' : '') + Math.round(x / 100 * cyc).toLocaleString('en-US') + ' 元';
+  const today = (S.meta.today || []).slice(-1)[0] || S.days[S.days.length - 1] || {};
+  const sched = S.meta.costs.conv_schedule.find(s => (s.from || '0') <= dayStr(L.ts) && dayStr(L.ts) <= (s.to || '9'));
+  const tile = (k, v, d, cl) => '<div class="tile"><div class="k">' + k + '</div><div class="v ' + (cl || '') + '">' + v + '</div><div class="d">' + d + '</div></div>';
+  $('tiles').innerHTML =
+    tile('BitoPro 溢價（' + m.short + '）', fPct(L[m.bito]), 'MAX ' + fPct(L[m.max]) + ' · bid1 ' + fPct(L.bb, 2) + ' / ask1 ' + fPct(L.ba, 2))
+    + tile('現在掛單賣（maker）淨利', fPct(mk), '每圈 ' + (cyc / 10000) + ' 萬 ' + twd(mk) + ' · 以 ask1 計', cls(mk))
+    + tile('現在市價賣（taker）淨利', fPct(tk), twd(tk) + ' · 以 ' + m.short + ' 計', cls(tk))
+    + tile('損平 maker / taker', c.beM.toFixed(3) + ' / ' + c.beT.toFixed(3), '美元換 U ' + c.conv + '%' + (sched && sched.to ? '（至 ' + sched.to.slice(5).replace('-', '/') + '）' : '') + ' · 進場門檻 ' + c.enter.toFixed(3) + '%')
+    + tile('匯率 USD/TWD', fFx(L.fx), (L.fx_source || '') + ' · ±0.1% 深度 ' + fInt(L.db) + ' U')
+    + tile('今日 ' + (today.d ? today.d.slice(5).replace('-', '/') : ''), fPct(today.avg), '最高 ' + fPct(today.max, 2) + (today.biz ? ' · 銀行時段平均 ' + fPct(today.bavg, 2) : ' · 銀行未營業'));
+}
+function renderBadge(){
+  if (!S.meta) return; const age = Date.now() / 1000 - S.meta.last.ts, b = $('badge');
+  const txt = age < 90 ? Math.max(0, Math.round(age)) + ' 秒前' : age < 5400 ? Math.round(age / 60) + ' 分鐘前' : (age / 3600).toFixed(1) + ' 小時前';
+  const okLim = LOCAL ? 120 : 600, warnLim = LOCAL ? 900 : 1500;
+  b.className = 'badge ' + (age < okLim ? 'ok' : age < warnLim ? 'warn' : 'bad');
+  b.textContent = (age < okLim ? '監控運作中' : age < warnLim ? '資料延遲' : '資料停止更新？') + ' · 最新資料 ' + txt;
+  $('clock').textContent = '資料時間 ' + S.meta.last.local + '（台灣）· 共 ' + (S.days.length + (S.meta.today || []).length) + ' 天 · 每 ' + S.meta.interval_sec + ' 秒一筆 · 頁面自動更新';
+}
+
+/* ───────────── 資料更新 ───────────── */
+function setMeta(meta){
+  S.meta = meta; S.holidays = new Set(meta.bank.holidays); S.costCache.clear();
+  const hm = m => pad2(m / 60 | 0) + ':' + pad2(m % 60); if ($('bh')) $('bh').textContent = hm(meta.bank.open) + '–' + hm(meta.bank.close);
+  if (!S.tier || !meta.costs.tiers[S.tier]) S.tier = meta.costs.tier;
+  if (!METRICS[S.metric]) S.metric = 'b3';
+}
+function indexDays(){ S.dayMap.clear(); for (const d of S.days){ d.final = true; S.dayMap.set(d.d, d); } for (const d of (S.meta.today || [])){ d.final = false; S.dayMap.set(d.d, d); } }
+async function refresh(first){
+  try {
+    const meta = await getJSON('data/meta.json?_=' + Math.floor(Date.now() / 15000));
+    if (!first && S.meta && meta.generated === S.meta.generated){ renderBadge(); return; }
+    const prevRev = S.meta ? S.meta.days_rev : null, prevLast = S.meta ? dataEnd() : 0;
+    if (S.meta && meta.v !== S.meta.v){ location.reload(); return; }
+    setMeta(meta);
+    const jobs = [getJSON('data/ov.json?g=' + meta.generated).then(j => { S.ov = decBlock(j, false); })];
+    if (meta.days_rev !== prevRev) jobs.push(getJSON('data/days.json?r=' + encodeURIComponent(meta.days_rev)).then(j => { S.days = j.days; }));
+    await Promise.all(jobs);
+    indexDays();
+    for (const lv of ['d', 'r']) for (const [day] of [...S.cache[lv]]){ const st = S.dayMap.get(day); if (!st || !st.final || day >= dayStr(prevLast || 0)) S.cache[lv].delete(day); }
+    S.concat.clear();
+    $('err').style.display = 'none';
+    if (!S.inited){ fillTiers(); initView(); S.inited = true; }
+    else if (S.view.follow){ const span = S.view.t1 - S.view.t0; if (S.view.preset === 'all') applyPreset('all'); else { const hi = dataEnd() + span * 0.012; S.view.t0 = hi - span; S.view.t1 = hi; syncControls(); } }
+    renderTiles(); renderBadge(); renderDaily(); renderAlerts(); requestRender(); scheduleStats();
+  } catch (e){
+    if (!S.inited){ $('err').style.display = 'block'; $('err').textContent = '資料載入失敗：' + e.message + '（稍後會自動重試）'; $('badge').textContent = '載入失敗'; $('badge').className = 'badge bad'; }
+    console.error(e);
+  }
+}
+function initView(){
+  const h = readHash();
+  if (h.m && METRICS[h.m]) S.metric = h.m;
+  if (h.c && S.meta.costs.tiers[h.c]) S.tier = h.c;
+  $('metric').value = S.metric; $('tier').value = S.tier;
+  if (h.f && h.t && +h.t > +h.f) setView(+h.f, +h.t, {follow: false});
+  else applyPreset(h.w || LS.get('preset', '7d'));
+}
+function initControls(){
+  $('presets').innerHTML = PRESETS.map(p => '<button data-p="' + p[0] + '">' + p[1] + '</button>').join('');
+  $('presets').addEventListener('click', e => { const k = e.target.dataset.p; if (k) applyPreset(k); });
+  $('nav').addEventListener('click', e => { const k = e.target.dataset.nav, v = S.view, span = v.t1 - v.t0, c = (v.t0 + v.t1) / 2; if (!k) return;
+    if (k === 'left') panBy(-span / 2); else if (k === 'right') panBy(span / 2); else if (k === 'in') zoomAt(v.follow ? v.t1 : c, 0.5); else zoomAt(v.follow ? v.t1 : c, 2); });
+  $('latest').addEventListener('click', () => { const span = S.view.t1 - S.view.t0, hi = dataEnd() + span * 0.012; setView(hi - span, hi, {follow: true, preset: S.view.preset}); });
+  const applyDates = () => { const a = fromInput($('from').value), b = fromInput($('to').value); if (a === a && b === b && b > a) setView(a, b, {follow: false}); };
+  $('from').addEventListener('change', applyDates); $('to').addEventListener('change', applyDates);
+  $('copy').addEventListener('click', () => { const v = S.view, url = location.origin + location.pathname + '#f=' + Math.round(v.t0) + '&t=' + Math.round(v.t1) + (S.metric !== 'b3' ? '&m=' + S.metric : '') + (S.tier !== S.meta.costs.tier ? '&c=' + S.tier : '');
+    const done = () => { $('copy').textContent = '已複製'; setTimeout(() => { $('copy').textContent = '複製連結'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => prompt('複製這個連結：', url)); else prompt('複製這個連結：', url); });
+  $('metric').innerHTML = Object.keys(METRICS).map(k => '<option value="' + k + '">' + METRICS[k].label + '</option>').join('');
+  $('metric').addEventListener('change', e => { S.metric = e.target.value; LS.set('metric', S.metric); renderTiles(); renderDaily(); requestRender(); scheduleStats(); writeHash(); });
+  $('tier').addEventListener('change', e => { S.tier = e.target.value; LS.set('tier', S.tier); S.costCache.clear(); renderTiles(); renderDaily(); requestRender(); scheduleStats(); writeHash(); });
+  for (const [id, key] of [['sMax', 'max'], ['sFx', 'fx'], ['sDepth', 'depth'], ['sDiff', 'diff']]){
+    $(id).checked = !!S.show[key];
+    $(id).addEventListener('change', e => { S.show[key] = e.target.checked; LS.set('show', S.show); requestRender(); });
+  }
+  $('daily').addEventListener('click', e => { const tr = e.target.closest('tr[data-d]'); if (!tr) return; const a = dayStart(tr.dataset.d); setView(a, a + DAY, {follow: false}); $('sec-prem').scrollIntoView({behavior: 'smooth', block: 'center'}); });
+  $('alerts').addEventListener('click', e => { const tr = e.target.closest('tr[data-t]'); if (!tr) return; const t = +tr.dataset.t; setView(t - 2 * 3600, t + 4 * 3600, {follow: false}); $('sec-prem').scrollIntoView({behavior: 'smooth', block: 'center'}); });
+  document.addEventListener('keydown', e => { if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || !S.meta) return; const v = S.view, span = v.t1 - v.t0;
+    if (e.key === 'ArrowLeft') panBy(-span / 4); else if (e.key === 'ArrowRight') panBy(span / 4); else if (e.key === '+' || e.key === '=') zoomAt((v.t0 + v.t1) / 2, 0.5); else if (e.key === '-' || e.key === '_') zoomAt((v.t0 + v.t1) / 2, 2); });
+  window.addEventListener('hashchange', () => { if (S.inited) initView(); });     /* 在已開的分頁貼上分享連結也會跳到該視窗 */
+  let rz = 0; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(requestRender, 80); });
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestRender);
+}
+function fillTiers(){ const c = S.meta.costs; $('tier').innerHTML = Object.keys(c.tiers).map(k => '<option value="' + k + '">' + c.tiers[k].label + '（maker ' + c.tiers[k].maker + '% / taker ' + c.tiers[k].taker + '%）' + (k === c.tier ? ' ← 目前' : '') + '</option>').join(''); $('tier').value = S.tier; }
+
+(async function main(){
+  readPalette(); buildPanels(); initControls(); attachOvEvents();
+  await refresh(true);
+  setInterval(() => refresh(false), LOCAL ? 20000 : 60000);     /* 資料沒變就只更新徽章，不重畫 */
+  setInterval(renderBadge, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
+})();
+</script>
+</body>
+</html>
